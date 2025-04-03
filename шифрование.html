@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шифрование и дешифрование файлов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            width: 80%;
+            max-width: 600px;
+            margin-top: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+
+        input[type="password"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+        }
+
+        button:hover {
+            background-color: #3e8e41;
+        }
+
+        #result {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #downloadLink {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #0056b3;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #downloadLink:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Шифрование и дешифрование файлов</h1>
+
+        <label for="fileInput">Выберите файл:</label>
+        <input type="file" id="fileInput">
+
+        <label for="passwordInput">Введите пароль:</label>
+        <input type="password" id="passwordInput" placeholder="Пароль">
+
+        <button onclick="encryptFile()">Зашифровать</button>
+        <button onclick="decryptFile()">Дешифровать</button>
+
+        <div id="result"></div>
+        <a href="#" id="downloadLink" style="display:none;">Скачать файл</a>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        function getKey(password) {
+            // Создаем SHA256 хэш пароля
+            const hash = CryptoJS.SHA256(password).toString();
+            // Обрезаем хэш до 8 байт (64 бита)
+            const key = hash.substring(0, 16);
+            return key;
+        }
+
+        function encryptFile() {
+            const fileInput = document.getElementById('fileInput');
+            const passwordInput = document.getElementById('passwordInput');
+            const resultDiv = document.getElementById('result');
+            const downloadLink = document.getElementById('downloadLink');
+
+            const file = fileInput.files[0];
+            const password = passwordInput.value;
+
+            if (!file) {
+                resultDiv.textContent = "Пожалуйста, выберите файл.";
+                return;
+            }
+
+            if (!password) {
+                resultDiv.textContent = "Пожалуйста, введите пароль.";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const fileData = e.target.result;
+
+                // Получаем 64-битный ключ
+                const key = getKey(password);
+
+                // Шифрование AES с обрезанным ключом
+                const encrypted = CryptoJS.AES.encrypt(fileData, key).toString();
+
+                // Создаем Blob из зашифрованных данных
+                const encryptedBlob = new Blob([encrypted]);
+
+                // Создаем ссылку для скачивания
+                const url = window.URL.createObjectURL(encryptedBlob);
+                downloadLink.href = url;
+                downloadLink.download = file.name + ".encrypted"; // Добавляем расширение ".encrypted"
+                downloadLink.style.display = 'block';
+                resultDiv.textContent = "Файл зашифрован!";
+            };
+            reader.onerror = function (e) {
+                resultDiv.textContent = "Ошибка чтения файла.";
+            };
+            reader.readAsDataURL(file); // Читаем файл как Data URL
+        }
+
+        function decryptFile() {
+            const fileInput = document.getElementById('fileInput');
+            const passwordInput = document.getElementById('passwordInput');
+            const resultDiv = document.getElementById('result');
+            const downloadLink = document.getElementById('downloadLink');
+
+            const file = fileInput.files[0];
+            const password = passwordInput.value;
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            function attemptDecryption() {
+                attempts++;
+
+                if (!file) {
+                    resultDiv.textContent = "Пожалуйста, выберите файл.";
+                    return;
+                }
+
+                if (!password) {
+                    resultDiv.textContent = "Пожалуйста, введите пароль.";
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const fileData = e.target.result;
+
+                    try {
+                        // Получаем 64-битный ключ
+                        const key = getKey(password);
+
+                        // Дешифрование AES с обрезанным ключом
+                        const decrypted = CryptoJS.AES.decrypt(fileData, key).toString(CryptoJS.enc.Utf8);
+
+                        if (!decrypted) {
+                            if (attempts < maxAttempts) {
+                                resultDiv.textContent = `Неверный пароль. Попытка ${attempts} из ${maxAttempts}.`;
+                                passwordInput.value = ""; // Очищаем поле пароля
+                                return;
+                            } else {
+                                resultDiv.textContent = "Превышено количество попыток. Дешифрование невозможно.";
+                                return;
+                            }
+
+                        }
+
+                        // Создаем Blob из расшифрованных данных
+                        const decryptedBlob = dataURLtoBlob(decrypted);
+
+                        // Создаем ссылку для скачивания
+                        const url = window.URL.createObjectURL(decryptedBlob);
+                        downloadLink.href = url;
+                        downloadLink.download = file.name.replace(".encrypted", ""); // Удаляем расширение ".encrypted"
+                        downloadLink.style.display = 'block';
+                        resultDiv.textContent = "Файл расшифрован!";
+
+                    } catch (error) {
+                         if (attempts < maxAttempts) {
+                                resultDiv.textContent = `Неверный пароль или файл поврежден. Попытка ${attempts} из ${maxAttempts}.`;
+                                passwordInput.value = ""; // Очищаем поле пароля
+                                return;
+                            } else {
+                                resultDiv.textContent = "Превышено количество попыток. Дешифрование невозможно.";
+                                return;
+                            }
+                    }
+                };
+                reader.onerror = function (e) {
+                    resultDiv.textContent = "Ошибка чтения файла.";
+                };
+                reader.readAsText(file); // Читаем файл как текст
+
+            }
+
+             attemptDecryption();
+        }
+
+        // Функция для преобразования Data URL в Blob
+        function dataURLtoBlob(dataURL) {
+            const parts = dataURL.split(';base64,');
+            const contentType = parts[0].split(':')[1];
+            const raw = window.atob(parts[1]);
+            const rawLength = raw.length;
+            const uInt8Array = new Uint8Array(rawLength);
+
+            for (let i = 0; i < rawLength; ++i) {
+                uInt8Array[i] = raw.charCodeAt(i);
+            }
+
+            return new Blob([uInt8Array], { type: contentType });
+        }
+    </script>
+
+</body>
+</html>
